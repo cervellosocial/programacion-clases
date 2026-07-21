@@ -29,6 +29,7 @@ const CATEGORIAS_EJERCICIO = ["Calentamiento", "Cesta / Cubo", "Peloteo / Contro
 const NIVELES = ["Iniciación", "Intermedio", "Avanzado / Competición"];
 
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2);
+const fechaHoy = () => new Date().toISOString().slice(0, 10);
 
 const DATA_INICIAL = {
   apiKey: "",
@@ -36,12 +37,20 @@ const DATA_INICIAL = {
     { id: "g1", nombre: "Grupo Infantil A", nivel: "Iniciación", dias: "Lunes y Miércoles 17:00", objetivo: "Consistencia de fondo y empuñadura de derecha" }
   ],
   alumnos: [
-    { id: "a1", grupoId: "g1", nombre: "Marc", fortalezas: "Buena movilidad", aMejorar: "Empuñadura de revés corta" },
-    { id: "a2", grupoId: "g1", nombre: "Laia", fortalezas: "Buen impacto de derecha", aMejorar: "Cierre de golpe tras impacto" }
+    { 
+      id: "a1", 
+      grupoId: "g1", 
+      nombre: "Marc", 
+      fortalezas: "Buena velocidad y movilidad", 
+      aMejorar: "Empuñadura de revés demasiado corta",
+      historial: [
+        { id: "h1", fecha: "2026-09-15", nota: "Inicio de curso. Le cuesta el armado de revés." },
+        { id: "h2", fecha: "2026-11-10", nota: "Mejora notable en el impacto de derecha." }
+      ]
+    }
   ],
   ejercicios: [
-    { id: "e1", titulo: "Diana en el fondo", categoria: "Cesta / Cubo", nivel: "Iniciación", descripcion: "Lanzamiento con cesta hacia conos en las esquinas profundas." },
-    { id: "e2", titulo: "Peloteo cruzado a 10 toques", categoria: "Peloteo / Control", nivel: "Iniciación", descripcion: "Mantener bola viva en diagonal buscando consistencia." }
+    { id: "e1", titulo: "Diana en el fondo", categoria: "Cesta / Cubo", nivel: "Iniciación", descripcion: "Lanzamiento con cesta hacia conos en las esquinas profundas." }
   ],
   diario: []
 };
@@ -63,7 +72,6 @@ function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [data]);
 
-  // Actualizadores de estado
   const updateData = (key, newValue) => {
     setData(prev => ({ ...prev, [key]: newValue }));
   };
@@ -244,18 +252,58 @@ function TabGrupos({ data, updateData }) {
   );
 }
 
-// ------------------- PESTAÑA ALUMNOS & EVOLUCIÓN -------------------
+// ------------------- PESTAÑA ALUMNOS & EVOLUCIÓN (CON EDICIÓN E HISTORIAL) -------------------
 function TabAlumnos({ data, updateData }) {
   const [grupoId, setGrupoId] = useState(data.grupos[0]?.id || "");
   const [nombre, setNombre] = useState("");
   const [fortalezas, setFortalezas] = useState("");
   const [aMejorar, setAMejorar] = useState("");
+  
+  // Estado para edición y modal de evolución
+  const [editandoAlumno, setEditandoAlumno] = useState(null);
+  const [alumnoEvolucion, setAlumnoEvolucion] = useState(null);
+  const [nuevaNotaEvolucion, setNuevaNotaEvolucion] = useState("");
 
-  const agregarAlumno = (e) => {
+  const agregarOGuardarAlumno = (e) => {
     e.preventDefault();
     if (!nombre.trim() || !grupoId) return;
-    const nuevo = { id: uid(), grupoId, nombre: nombre.trim(), fortalezas: fortalezas.trim(), aMejorar: aMejorar.trim() };
-    updateData("alumnos", [...data.alumnos, nuevo]);
+
+    if (editandoAlumno) {
+      // Guardar cambios de edición
+      const actualizados = data.alumnos.map(a => {
+        if (a.id === editandoAlumno.id) {
+          return { ...a, grupoId, nombre: nombre.trim(), fortalezas: fortalezas.trim(), aMejorar: aMejorar.trim() };
+        }
+        return a;
+      });
+      updateData("alumnos", actualizados);
+      setEditandoAlumno(null);
+    } else {
+      // Crear nuevo alumno
+      const nuevo = { 
+        id: uid(), 
+        grupoId, 
+        nombre: nombre.trim(), 
+        fortalezas: fortalezas.trim(), 
+        aMejorar: aMejorar.trim(),
+        historial: [{ id: uid(), fecha: fechaHoy(), nota: "Alta en el grupo." }] 
+      };
+      updateData("alumnos", [...data.alumnos, nuevo]);
+    }
+
+    setNombre(""); setFortalezas(""); setAMejorar("");
+  };
+
+  const iniciarEdicion = (alumno) => {
+    setEditandoAlumno(alumno);
+    setGrupoId(alumno.grupoId);
+    setNombre(alumno.nombre);
+    setFortalezas(alumno.fortalezas || "");
+    setAMejorar(alumno.aMejorar || "");
+  };
+
+  const cancelarEdicion = () => {
+    setEditandoAlumno(null);
     setNombre(""); setFortalezas(""); setAMejorar("");
   };
 
@@ -263,10 +311,44 @@ function TabAlumnos({ data, updateData }) {
     updateData("alumnos", data.alumnos.filter(a => a.id !== id));
   };
 
+  const agregarHitoEvolucion = (e) => {
+    e.preventDefault();
+    if (!nuevaNotaEvolucion.trim() || !alumnoEvolucion) return;
+
+    const nuevaEntrada = { id: uid(), fecha: fechaHoy(), nota: nuevaNotaEvolucion.trim() };
+    const actualizados = data.alumnos.map(a => {
+      if (a.id === alumnoEvolucion.id) {
+        return { ...a, historial: [nuevaEntrada, ...(a.historial || [])] };
+      }
+      return a;
+    });
+
+    updateData("alumnos", actualizados);
+    setAlumnoEvolucion(prev => ({ ...prev, historial: [nuevaEntrada, ...(prev.historial || [])] }));
+    setNuevaNotaEvolucion("");
+  };
+
+  const eliminarHitoHistorial = (alumnoId, hitoId) => {
+    const actualizados = data.alumnos.map(a => {
+      if (a.id === alumnoId) {
+        return { ...a, historial: a.historial.filter(h => h.id !== hitoId) };
+      }
+      return a;
+    });
+    updateData("alumnos", actualizados);
+    setAlumnoEvolucion(prev => ({ ...prev, historial: prev.historial.filter(h => h.id !== hitoId) }));
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      <form onSubmit={agregarAlumno} className="bg-white p-5 rounded-2xl border border-[#E3DFD3] shadow-xs h-fit flex flex-col gap-3">
-        <h3 className="font-bold text-sm text-gray-800">Registrar Alumno</h3>
+      {/* Formulario Crear / Editar */}
+      <form onSubmit={agregarOGuardarAlumno} className="bg-white p-5 rounded-2xl border border-[#E3DFD3] shadow-xs h-fit flex flex-col gap-3">
+        <div className="flex justify-between items-center">
+          <h3 className="font-bold text-sm text-gray-800">{editandoAlumno ? "✏️ Editar Alumno" : "Registrar Alumno"}</h3>
+          {editandoAlumno && (
+            <button type="button" onClick={cancelarEdicion} className="text-xs text-gray-400 hover:text-gray-600">Cancelar</button>
+          )}
+        </div>
         <div>
           <label className="text-xs font-semibold text-gray-500 block mb-1">Grupo Asignado</label>
           <select value={grupoId} onChange={e => setGrupoId(e.target.value)} className="w-full border rounded-xl p-2 text-xs outline-none">
@@ -285,9 +367,12 @@ function TabAlumnos({ data, updateData }) {
           <label className="text-xs font-semibold text-gray-500 block mb-1">Aspectos Técnicos / Tácticos a Mejorar</label>
           <textarea placeholder="Ej: Falla en la preparación del revés, se precipita" value={aMejorar} onChange={e => setAMejorar(e.target.value)} className="w-full border rounded-xl p-2 text-xs outline-none h-20" />
         </div>
-        <button type="submit" className="bg-[#1F3D2B] text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#2F5741]">Añadir Alumno</button>
+        <button type="submit" className="bg-[#1F3D2B] text-white text-xs font-bold py-2.5 rounded-xl hover:bg-[#2F5741]">
+          {editandoAlumno ? "Guardar Cambios" : "Añadir Alumno"}
+        </button>
       </form>
 
+      {/* Lista de Alumnos por Grupo */}
       <div className="md:col-span-2 flex flex-col gap-4">
         {data.grupos.map(g => {
           const alumnosGrupo = data.alumnos.filter(a => a.grupoId === g.id);
@@ -302,11 +387,27 @@ function TabAlumnos({ data, updateData }) {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {alumnosGrupo.map(a => (
-                    <div key={a.id} className="p-3 bg-[#F8F6F0] rounded-xl border border-gray-200/60 relative group">
-                      <button onClick={() => eliminarAlumno(a.id)} className="absolute top-2 right-2 text-xs text-gray-400 hover:text-red-500">✕</button>
-                      <span className="font-bold text-xs text-gray-800 block mb-1">{a.nombre}</span>
-                      {a.fortalezas && <p className="text-[11px] text-emerald-700"><strong>+</strong> {a.fortalezas}</p>}
-                      {a.aMejorar && <p className="text-[11px] text-amber-700"><strong>△</strong> {a.aMejorar}</p>}
+                    <div key={a.id} className="p-3 bg-[#F8F6F0] rounded-xl border border-gray-200/60 flex flex-col justify-between">
+                      <div>
+                        <div className="flex justify-between items-start mb-1">
+                          <span className="font-bold text-xs text-gray-800">{a.nombre}</span>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => iniciarEdicion(a)} title="Editar datos principales" className="text-xs text-gray-400 hover:text-blue-600 p-0.5">✏️</button>
+                            <button onClick={() => eliminarAlumno(a.id)} title="Eliminar alumno" className="text-xs text-gray-400 hover:text-red-500 p-0.5">✕</button>
+                          </div>
+                        </div>
+                        {a.fortalezas && <p className="text-[11px] text-emerald-700"><strong>+</strong> {a.fortalezas}</p>}
+                        {a.aMejorar && <p className="text-[11px] text-amber-700"><strong>△</strong> {a.aMejorar}</p>}
+                      </div>
+
+                      {/* Botón Abrir Historial de Evolución */}
+                      <button 
+                        onClick={() => setAlumnoEvolucion(a)}
+                        className="mt-3 pt-2 border-t border-gray-200/80 text-[11px] text-[#1F3D2B] font-bold flex items-center justify-between hover:underline"
+                      >
+                        <span>📈 Evolución ({(a.historial || []).length} registros)</span>
+                        <span>→</span>
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -315,6 +416,52 @@ function TabAlumnos({ data, updateData }) {
           );
         })}
       </div>
+
+      {/* Modal / Panel de Historial de Evolución */}
+      {alumnoEvolucion && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl border border-gray-100 max-h-[85vh] flex flex-col">
+            <div className="flex justify-between items-start border-b pb-3 mb-3">
+              <div>
+                <h3 className="font-bold text-sm text-gray-800">Evolución de {alumnoEvolucion.nombre}</h3>
+                <p className="text-[11px] text-gray-400">Historial continuo para el informe final de IA</p>
+              </div>
+              <button onClick={() => setAlumnoEvolucion(null)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+            </div>
+
+            {/* Formulario Nueva Nota de Evolución */}
+            <form onSubmit={agregarHitoEvolucion} className="mb-4 flex flex-col gap-2">
+              <textarea 
+                required 
+                placeholder="Ej: Hoy ha conseguido mantener 10 bolas cruzadas de revés sin fallar..." 
+                value={nuevaNotaEvolucion} 
+                onChange={e => setNuevaNotaEvolucion(e.target.value)}
+                className="w-full border rounded-xl p-2 text-xs outline-none focus:border-[#1F3D2B] h-16"
+              />
+              <button type="submit" className="bg-[#1F3D2B] text-white text-xs font-bold py-1.5 rounded-xl hover:bg-[#2F5741] self-end px-3">
+                + Añadir Avance
+              </button>
+            </form>
+
+            {/* Línea de Tiempo / Hitos */}
+            <div className="overflow-y-auto flex-1 flex flex-col gap-2 pr-1">
+              {(alumnoEvolucion.historial || []).length === 0 ? (
+                <p className="text-xs text-gray-400 italic text-center py-4">Sin registro de hitos aún.</p>
+              ) : (
+                alumnoEvolucion.historial.map(h => (
+                  <div key={h.id} className="p-2.5 bg-[#F8F6F0] rounded-xl border border-gray-200/80 text-xs flex justify-between items-start gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold text-emerald-800 block mb-0.5">{h.fecha}</span>
+                      <p className="text-gray-700">{h.nota}</p>
+                    </div>
+                    <button onClick={() => eliminarHitoHistorial(alumnoEvolucion.id, h.id)} className="text-gray-300 hover:text-red-500 text-xs">✕</button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -394,7 +541,7 @@ function TabEjercicios({ data, updateData }) {
 // ------------------- PESTAÑA DIARIO DE CLASES -------------------
 function TabDiario({ data, updateData }) {
   const [grupoId, setGrupoId] = useState(data.grupos[0]?.id || "");
-  const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
+  const [fecha, setFecha] = useState(fechaHoy());
   const [resumen, setResumen] = useState("");
   const [feedback, setFeedback] = useState("");
 
@@ -458,19 +605,19 @@ function TabDiario({ data, updateData }) {
   );
 }
 
-// ------------------- PESTAÑA COPILOTO IA (PROXIMAMENTE) -------------------
+// ------------------- PESTAÑA COPILOTO IA -------------------
 function TabIA({ data }) {
   return (
     <div className="bg-white p-8 rounded-2xl border border-[#E3DFD3] text-center max-w-xl mx-auto my-8">
       <div className="text-4xl mb-3">🤖</div>
-      <h3 className="text-base font-extrabold text-[#1F3D2B] mb-2">Fase 1 Completada con Éxito</h3>
+      <h3 className="text-base font-extrabold text-[#1F3D2B] mb-2">Fase 1 Mejorada con Éxito</h3>
       <p className="text-xs text-gray-500 leading-relaxed mb-4">
-        Actualmente tu aplicación ya cuenta con <strong>{data.grupos.length} grupos</strong>, <strong>{data.alumnos.length} alumnos</strong>, <strong>{data.ejercicios.length} ejercicios</strong> y <strong>{data.diario.length} entrenamientos</strong> guardados localmente.
+        Tu aplicación ahora no solo guarda la estructura, sino también la <strong>línea de tiempo de evolución de cada alumno</strong> para elaborar los informes de evaluación de fin de curso.
       </p>
       <div className="bg-[#F8F6F0] p-4 rounded-xl text-left text-xs text-gray-600 flex flex-col gap-2 mb-4">
-        <span>✅ Datos listos para el aprendizaje de la IA.</span>
-        <span>✅ Configuración de API Key preparada.</span>
-        <span>⏳ Siguiente paso: Conectar el motor generador de sesiones de entrenamiento.</span>
+        <span>✅ Edición de perfiles de alumnos habilitada.</span>
+        <span>✅ Historial de hitos y progresos fechado.</span>
+        <span>⏳ Todo preparado para el motor de generación e informes por IA.</span>
       </div>
     </div>
   );
