@@ -33,6 +33,7 @@ const fechaHoy = () => new Date().toISOString().slice(0, 10);
 
 const DATA_INICIAL = {
   apiKey: "",
+  apiProveedor: "openai", // "openai" o "gemini"
   grupos: [
     { id: "g1", nombre: "Grupo Infantil A", nivel: "Iniciación", dias: "Lunes y Miércoles 17:00", objetivo: "Consistencia de fondo y empuñadura de derecha" }
   ],
@@ -50,7 +51,8 @@ const DATA_INICIAL = {
     }
   ],
   ejercicios: [
-    { id: "e1", titulo: "Diana en el fondo", categoria: "Cesta / Cubo", nivel: "Iniciación", descripcion: "Lanzamiento con cesta hacia conos en las esquinas profundas." }
+    { id: "e1", titulo: "Diana en el fondo", categoria: "Cesta / Cubo", nivel: "Iniciación", descripcion: "Lanzamiento con cesta hacia conos en las esquinas profundas." },
+    { id: "e2", titulo: "Rayo de Volea", categoria: "Situación de Juego", nivel: "Iniciación", descripcion: "Red contra fondo a un bote obligatorio." }
   ],
   diario: []
 };
@@ -116,9 +118,10 @@ function App() {
           </div>
           <button 
             onClick={() => setSettingsOpen(!settingsOpen)}
-            className="bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-2 rounded-lg transition-colors border border-white/10"
+            className="bg-white/10 hover:bg-white/20 text-white text-xs px-3 py-2 rounded-lg transition-colors border border-white/10 flex items-center gap-1.5"
           >
-            ⚙️ Configuración API
+            ⚙️ <span>Configuración API</span>
+            {data.apiKey ? <span className="w-2 h-2 rounded-full bg-emerald-400"></span> : <span className="w-2 h-2 rounded-full bg-amber-400"></span>}
           </button>
         </div>
       </header>
@@ -127,18 +130,30 @@ function App() {
       {settingsOpen && (
         <div className="bg-amber-50 border-b border-amber-200 p-4">
           <div className="max-w-6xl mx-auto flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-            <div className="flex-1 w-full">
-              <label className="text-xs font-bold text-amber-900 block mb-1">Clave API de IA (OpenAI / Gemini)</label>
-              <input 
-                type="password" 
-                placeholder="sk-..." 
-                value={data.apiKey || ""} 
-                onChange={(e) => updateData("apiKey", e.target.value)}
-                className="w-full max-w-md bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs outline-none"
-              />
-              <span className="text-[10px] text-amber-700 block mt-1">Se guarda de forma 100% privada en tu navegador.</span>
+            <div className="flex-1 w-full flex flex-col sm:flex-row gap-3">
+              <div className="w-36">
+                <label className="text-xs font-bold text-amber-900 block mb-1">Proveedor IA</label>
+                <select 
+                  value={data.apiProveedor || "openai"} 
+                  onChange={(e) => updateData("apiProveedor", e.target.value)}
+                  className="w-full bg-white border border-amber-300 rounded-lg p-1.5 text-xs outline-none font-semibold"
+                >
+                  <option value="openai">OpenAI (ChatGPT)</option>
+                  <option value="gemini">Google Gemini</option>
+                </select>
+              </div>
+              <div className="flex-1">
+                <label className="text-xs font-bold text-amber-900 block mb-1">API Key ({data.apiProveedor === "openai" ? "sk-..." : "AIzaSy..."})</label>
+                <input 
+                  type="password" 
+                  placeholder={data.apiProveedor === "openai" ? "sk-proj-..." : "AIzaSy..."} 
+                  value={data.apiKey || ""} 
+                  onChange={(e) => updateData("apiKey", e.target.value)}
+                  className="w-full bg-white border border-amber-300 rounded-lg px-3 py-1.5 text-xs outline-none"
+                />
+              </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 self-end md:self-center">
               <button onClick={exportarJSON} className="bg-white border border-amber-300 text-amber-900 text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-amber-100">Exportar Backup</button>
               <button onClick={() => fileInputRef.current?.click()} className="bg-white border border-amber-300 text-amber-900 text-xs px-3 py-1.5 rounded-lg font-semibold hover:bg-amber-100">Importar Backup</button>
               <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={importarJSON} />
@@ -155,7 +170,7 @@ function App() {
             ["alumnos", "👦 Alumnos & Evolución"],
             ["ejercicios", "📚 Biblioteca de Ejercicios"],
             ["diario", "📅 Diario de Clases"],
-            ["ia", "🤖 Copiloto IA (Próximamente)"]
+            ["ia", "🤖 Copiloto IA"]
           ].map(([k, label]) => (
             <button
               key={k}
@@ -174,7 +189,7 @@ function App() {
         {tab === "alumnos" && <TabAlumnos data={data} updateData={updateData} />}
         {tab === "ejercicios" && <TabEjercicios data={data} updateData={updateData} />}
         {tab === "diario" && <TabDiario data={data} updateData={updateData} />}
-        {tab === "ia" && <TabIA data={data} />}
+        {tab === "ia" && <TabIA data={data} updateData={updateData} />}
       </main>
     </div>
   );
@@ -252,14 +267,13 @@ function TabGrupos({ data, updateData }) {
   );
 }
 
-// ------------------- PESTAÑA ALUMNOS & EVOLUCIÓN (CON EDICIÓN E HISTORIAL) -------------------
+// ------------------- PESTAÑA ALUMNOS & EVOLUCIÓN -------------------
 function TabAlumnos({ data, updateData }) {
   const [grupoId, setGrupoId] = useState(data.grupos[0]?.id || "");
   const [nombre, setNombre] = useState("");
   const [fortalezas, setFortalezas] = useState("");
   const [aMejorar, setAMejorar] = useState("");
   
-  // Estado para edición y modal de evolución
   const [editandoAlumno, setEditandoAlumno] = useState(null);
   const [alumnoEvolucion, setAlumnoEvolucion] = useState(null);
   const [nuevaNotaEvolucion, setNuevaNotaEvolucion] = useState("");
@@ -269,7 +283,6 @@ function TabAlumnos({ data, updateData }) {
     if (!nombre.trim() || !grupoId) return;
 
     if (editandoAlumno) {
-      // Guardar cambios de edición
       const actualizados = data.alumnos.map(a => {
         if (a.id === editandoAlumno.id) {
           return { ...a, grupoId, nombre: nombre.trim(), fortalezas: fortalezas.trim(), aMejorar: aMejorar.trim() };
@@ -279,7 +292,6 @@ function TabAlumnos({ data, updateData }) {
       updateData("alumnos", actualizados);
       setEditandoAlumno(null);
     } else {
-      // Crear nuevo alumno
       const nuevo = { 
         id: uid(), 
         grupoId, 
@@ -341,7 +353,6 @@ function TabAlumnos({ data, updateData }) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Formulario Crear / Editar */}
       <form onSubmit={agregarOGuardarAlumno} className="bg-white p-5 rounded-2xl border border-[#E3DFD3] shadow-xs h-fit flex flex-col gap-3">
         <div className="flex justify-between items-center">
           <h3 className="font-bold text-sm text-gray-800">{editandoAlumno ? "✏️ Editar Alumno" : "Registrar Alumno"}</h3>
@@ -372,7 +383,6 @@ function TabAlumnos({ data, updateData }) {
         </button>
       </form>
 
-      {/* Lista de Alumnos por Grupo */}
       <div className="md:col-span-2 flex flex-col gap-4">
         {data.grupos.map(g => {
           const alumnosGrupo = data.alumnos.filter(a => a.grupoId === g.id);
@@ -392,7 +402,7 @@ function TabAlumnos({ data, updateData }) {
                         <div className="flex justify-between items-start mb-1">
                           <span className="font-bold text-xs text-gray-800">{a.nombre}</span>
                           <div className="flex items-center gap-1">
-                            <button onClick={() => iniciarEdicion(a)} title="Editar datos principales" className="text-xs text-gray-400 hover:text-blue-600 p-0.5">✏️</button>
+                            <button onClick={() => iniciarEdicion(a)} title="Editar datos" className="text-xs text-gray-400 hover:text-blue-600 p-0.5">✏️</button>
                             <button onClick={() => eliminarAlumno(a.id)} title="Eliminar alumno" className="text-xs text-gray-400 hover:text-red-500 p-0.5">✕</button>
                           </div>
                         </div>
@@ -400,7 +410,6 @@ function TabAlumnos({ data, updateData }) {
                         {a.aMejorar && <p className="text-[11px] text-amber-700"><strong>△</strong> {a.aMejorar}</p>}
                       </div>
 
-                      {/* Botón Abrir Historial de Evolución */}
                       <button 
                         onClick={() => setAlumnoEvolucion(a)}
                         className="mt-3 pt-2 border-t border-gray-200/80 text-[11px] text-[#1F3D2B] font-bold flex items-center justify-between hover:underline"
@@ -417,19 +426,17 @@ function TabAlumnos({ data, updateData }) {
         })}
       </div>
 
-      {/* Modal / Panel de Historial de Evolución */}
       {alumnoEvolucion && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl border border-gray-100 max-h-[85vh] flex flex-col">
             <div className="flex justify-between items-start border-b pb-3 mb-3">
               <div>
                 <h3 className="font-bold text-sm text-gray-800">Evolución de {alumnoEvolucion.nombre}</h3>
-                <p className="text-[11px] text-gray-400">Historial continuo para el informe final de IA</p>
+                <p className="text-[11px] text-gray-400">Historial continuo de progreso</p>
               </div>
               <button onClick={() => setAlumnoEvolucion(null)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
             </div>
 
-            {/* Formulario Nueva Nota de Evolución */}
             <form onSubmit={agregarHitoEvolucion} className="mb-4 flex flex-col gap-2">
               <textarea 
                 required 
@@ -443,7 +450,6 @@ function TabAlumnos({ data, updateData }) {
               </button>
             </form>
 
-            {/* Línea de Tiempo / Hitos */}
             <div className="overflow-y-auto flex-1 flex flex-col gap-2 pr-1">
               {(alumnoEvolucion.historial || []).length === 0 ? (
                 <p className="text-xs text-gray-400 italic text-center py-4">Sin registro de hitos aún.</p>
@@ -605,19 +611,263 @@ function TabDiario({ data, updateData }) {
   );
 }
 
-// ------------------- PESTAÑA COPILOTO IA -------------------
-function TabIA({ data }) {
+// ------------------- PESTAÑA MOTOR DE IA (FASE 2) -------------------
+function TabIA({ data, updateData }) {
+  const [modo, setModo] = useState("clase"); // "clase" o "informe"
+  const [grupoId, setGrupoId] = useState(data.grupos[0]?.id || "");
+  const [alumnoId, setAlumnoId] = useState(data.alumnos[0]?.id || "");
+  const [objetivoClase, setObjetivoClase] = useState("Ataque y juego en la red (Volea / Remate)");
+  const [cargando, setCargando] = useState(false);
+  const [resultadoIA, setResultadoIA] = useState("");
+  const [errorAPI, setErrorAPI] = useState("");
+
+  const ejecutarIA = async () => {
+    if (!data.apiKey) {
+      setErrorAPI("Falta configurar tu API Key. Haz clic en '⚙️ Configuración API' arriba a la derecha.");
+      return;
+    }
+    setErrorAPI("");
+    setCargando(true);
+    setResultadoIA("");
+
+    const grupoSel = data.grupos.find(g => g.id === grupoId);
+    const alumnosGrupo = data.alumnos.filter(a => a.grupoId === grupoId);
+    const ultimasClases = data.diario.filter(d => d.grupoId === grupoId).slice(0, 4);
+
+    let systemPrompt = "";
+    let userPrompt = "";
+
+    if (modo === "clase") {
+      systemPrompt = "Eres un Director Técnico y Entrenador de Tenis de Elite. Genera sesiones de entrenamiento altamente profesionales, pedagógicas, estructuradas minuto a minuto y motivadoras.";
+      
+      userPrompt = `
+Genera una propuesta de clase de tenis estructurada de 60 minutos con el siguiente contexto:
+
+1. GRUPO: "${grupoSel?.nombre || 'General'}" (Nivel: ${grupoSel?.nivel}, Objetivo General: "${grupoSel?.objetivo || 'Consistencia'}")
+2. OBJETIVO ESPECÍFICO DE HOY: "${objetivoClase}"
+3. ALUMNOS EN PISTA:
+${alumnosGrupo.map(a => `- ${a.nombre}: Puntos fuertes (${a.fortalezas || 'N/A'}), A mejorar (${a.aMejorar || 'N/A'})`).join('\n')}
+
+4. ÚLTIMAS CLASES IMPARTIDAS Y FEEDBACK REGISTRADO:
+${ultimasClases.length === 0 ? "Sin historial previo." : ultimasClases.map(c => `- ${c.fecha}: ${c.resumen} (Feedback: ${c.feedback || 'Sin notas'})`).join('\n')}
+
+5. MI BIBLIOTECA DE EJERCICIOS DISPONIBLES (Prioriza usar o adaptar estos ejercicios si encajan con el objetivo):
+${data.ejercicios.map(e => `- [${e.categoria}] ${e.titulo}: ${e.descripcion}`).join('\n')}
+
+FORMATO REQUERIDO DE LA RESPUESTA:
+- **Estructura en 3 Bloques**: 
+  1. Calentamiento y Coordinación (10 min)
+  2. Parte Principal - Progresión Técnica/Táctica (35 min - 2 ejercicios progresivos)
+  3. Juego / Puntos / Competición Aplicada (15 min)
+- **Atención a detalles individuales**: Menciona en qué fijarse específicamente con algún alumno durante la sesión según sus áreas a mejorar.
+- Usa un tono directo, claro y profesional de entrenador.
+`;
+    } else {
+      // Modo Informe Alumno
+      const alumSel = data.alumnos.find(a => a.id === alumnoId);
+      systemPrompt = "Eres un Entrenador de Tenis redactando informes formales de evaluación para alumnos y padres.";
+      userPrompt = `
+Redacta un informe de evaluación técnico-táctica formal y alentador para la temporada/etapa de tenis con la siguiente información:
+
+- Alumno: ${alumSel?.nombre}
+- Grupo / Nivel: ${grupoSel?.nombre} (${grupoSel?.nivel})
+- Puntos Fuertes Identificados: ${alumSel?.fortalezas || 'Pared de fondo, constancia'}
+- Áreas de Trabajo Principales: ${alumSel?.aMejorar || 'Empuñaduras y saques'}
+- HISTORIAL Y LÍNEA DE TIEMPO DE AVANCES REGISTRADOS:
+${(alumSel?.historial || []).map(h => `- [${h.fecha}]: ${h.nota}`).join('\n')}
+
+ESTRUCTURA DEL INFORME:
+1. Resumen Ejecutivo de la Evolución.
+2. Aspectos Técnicos y Tácticos Destacados.
+3. Compromiso y Actitud en Pista.
+4. Objetivos y Recomendaciones para la Siguiente Etapa.
+`;
+    }
+
+    try {
+      let textoGenerado = "";
+
+      if (data.apiProveedor === "openai") {
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${data.apiKey}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userPrompt }
+            ],
+            temperature: 0.7
+          })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error?.message || "Error al conectar con OpenAI.");
+        }
+
+        const jsonRes = await res.json();
+        textoGenerado = jsonRes.choices[0].message.content;
+
+      } else {
+        // Proveedor Gemini
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${data.apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }]
+          })
+        });
+
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.error?.message || "Error al conectar con Gemini.");
+        }
+
+        const jsonRes = await res.json();
+        textoGenerado = jsonRes.candidates[0].content.parts[0].text;
+      }
+
+      setResultadoIA(textoGenerado);
+    } catch (err) {
+      setErrorAPI(err.message || "Error al conectar con la IA.");
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const guardarClaseEnDiario = () => {
+    if (!resultadoIA || modo !== "clase") return;
+    const nuevaSesion = {
+      id: uid(),
+      grupoId: grupoId,
+      fecha: fechaHoy(),
+      resumen: `[IA] Objetivo: ${objetivoClase}\n\n${resultadoIA.slice(0, 300)}...`,
+      feedback: "Generada automáticamente por Copiloto IA."
+    };
+    updateData("diario", [nuevaSesion, ...data.diario]);
+    alert("¡Clase guardada exitosamente en tu Diario de Clases!");
+  };
+
   return (
-    <div className="bg-white p-8 rounded-2xl border border-[#E3DFD3] text-center max-w-xl mx-auto my-8">
-      <div className="text-4xl mb-3">🤖</div>
-      <h3 className="text-base font-extrabold text-[#1F3D2B] mb-2">Fase 1 Mejorada con Éxito</h3>
-      <p className="text-xs text-gray-500 leading-relaxed mb-4">
-        Tu aplicación ahora no solo guarda la estructura, sino también la <strong>línea de tiempo de evolución de cada alumno</strong> para elaborar los informes de evaluación de fin de curso.
-      </p>
-      <div className="bg-[#F8F6F0] p-4 rounded-xl text-left text-xs text-gray-600 flex flex-col gap-2 mb-4">
-        <span>✅ Edición de perfiles de alumnos habilitada.</span>
-        <span>✅ Historial de hitos y progresos fechado.</span>
-        <span>⏳ Todo preparado para el motor de generación e informes por IA.</span>
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Formulario de Parámetros */}
+      <div className="bg-white p-5 rounded-2xl border border-[#E3DFD3] shadow-xs flex flex-col gap-4 h-fit">
+        <div>
+          <h3 className="font-extrabold text-base text-[#1F3D2B] mb-1">🤖 Generador IA</h3>
+          <p className="text-xs text-gray-500">Aprende de tus ejercicios y del historial de tu escuela.</p>
+        </div>
+
+        {/* Selector de Modo */}
+        <div className="flex bg-[#F8F6F0] p-1 rounded-xl border border-gray-200">
+          <button 
+            onClick={() => setModo("clase")}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${modo === "clase" ? "bg-[#1F3D2B] text-white shadow-xs" : "text-gray-500 hover:text-gray-800"}`}
+          >
+            🎾 Planificar Clase
+          </button>
+          <button 
+            onClick={() => setModo("informe")}
+            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${modo === "informe" ? "bg-[#1F3D2B] text-white shadow-xs" : "text-gray-500 hover:text-gray-800"}`}
+          >
+            📋 Informe Alumno
+          </button>
+        </div>
+
+        {modo === "clase" ? (
+          <>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 block mb-1">Seleccionar Grupo</label>
+              <select value={grupoId} onChange={e => setGrupoId(e.target.value)} className="w-full border rounded-xl p-2 text-xs outline-none">
+                {data.grupos.map(g => <option key={g.id} value={g.id}>{g.nombre} ({g.nivel})</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 block mb-1">Objetivo Técnico / Táctico de la Clase</label>
+              <textarea 
+                placeholder="Ej: Trabajo de profundidades de revés y cierre con volea alta..." 
+                value={objetivoClase} 
+                onChange={e => setObjetivoClase(e.target.value)}
+                className="w-full border rounded-xl p-2 text-xs outline-none h-24"
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 block mb-1">Seleccionar Alumno</label>
+              <select value={alumnoId} onChange={e => setAlumnoId(e.target.value)} className="w-full border rounded-xl p-2 text-xs outline-none">
+                {data.alumnos.map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+              </select>
+            </div>
+          </>
+        )}
+
+        {errorAPI && (
+          <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
+            {errorAPI}
+          </div>
+        )}
+
+        <button 
+          onClick={ejecutarIA} 
+          disabled={cargando}
+          className="bg-[#1F3D2B] text-white font-bold text-xs py-3 rounded-xl hover:bg-[#2F5741] transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+        >
+          {cargando ? (
+            <>
+              <span className="animate-spin">🌀</span>
+              <span>Procesando contexto...</span>
+            </>
+          ) : (
+            <>
+              <span>✨ Generar con IA</span>
+            </>
+          )}
+        </button>
+      </div>
+
+      {/* Visor de Resultados */}
+      <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-[#E3DFD3] shadow-xs min-h-[400px] flex flex-col justify-between">
+        <div>
+          <div className="flex justify-between items-center border-b pb-3 mb-4">
+            <h4 className="font-bold text-sm text-gray-800">
+              {modo === "clase" ? "📋 Propuesta de Clase Impartida" : "📄 Informe de Evaluación"}
+            </h4>
+            {resultadoIA && modo === "clase" && (
+              <button 
+                onClick={guardarClaseEnDiario}
+                className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+              >
+                💾 Guardar en Diario
+              </button>
+            )}
+          </div>
+
+          {!resultadoIA && !cargando && (
+            <div className="text-center py-16 text-gray-400">
+              <div className="text-4xl mb-2">💡</div>
+              <p className="text-xs">Selecciona las opciones a la izquierda y pulsa <strong>"Generar con IA"</strong>.</p>
+              <p className="text-[11px] text-gray-300 mt-1">La IA analizará tus ejercicios guardados e historial para preparar la sesión.</p>
+            </div>
+          )}
+
+          {cargando && (
+            <div className="text-center py-16 text-gray-400 animate-pulse">
+              <div className="text-4xl mb-2">🧠</div>
+              <p className="text-xs font-semibold text-gray-600">Analizando evoluciones de alumnos y ejercicios...</p>
+            </div>
+          )}
+
+          {resultadoIA && (
+            <div className="prose prose-sm max-w-none text-xs text-gray-700 whitespace-pre-wrap leading-relaxed font-mono bg-[#F8F6F0] p-4 rounded-xl border border-gray-200">
+              {resultadoIA}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
