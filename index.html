@@ -638,7 +638,7 @@ function TabIA({ data, updateData }) {
     let userPrompt = "";
 
     if (modo === "clase") {
-      systemPrompt = "Eres un Director Técnico y Entrenador de Tenis de Elite. Genera sesiones de entrenamiento highly profesionales, pedagógicas, estructuradas minuto a minuto y motivadoras.";
+      systemPrompt = "Eres un Director Técnico y Entrenador de Tenis de Elite. Genera sesiones de entrenamiento altamente profesionales, pedagógicas, estructuradas minuto a minuto y motivadoras.";
       
       userPrompt = `
 Genera una propuesta de clase de tenis estructurada de 60 minutos con el siguiente contexto:
@@ -713,8 +713,8 @@ ESTRUCTURA DEL INFORME:
         textoGenerado = jsonRes.choices[0].message.content;
 
       } else {
-        // Proveedor Gemini usando gemini-1.5-flash para la cuota estándar
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${data.apiKey}`, {
+        // FETCH CORREGIDO A LA API ESTABLE v1 DE GEMINI
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${data.apiKey}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -741,7 +741,7 @@ ESTRUCTURA DEL INFORME:
       setResultadoIA(textoGenerado);
     } catch (err) {
       setErrorAPI(err.message || "Error al conectar con la IA.");
-    } finally {
+    } fontinally {
       setCargando(false);
     }
   };
