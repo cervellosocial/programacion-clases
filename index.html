@@ -758,7 +758,7 @@ function TabIA({ data, updateData }) {
   const [errorAPI, setErrorAPI] = useState("");
 
   const ejecutarIA = async () => {
-    iif (!data.apiKey.trim()) {
+    if (!data.apiKey.trim()) {
       setErrorAPI("Falta configurar tu API Key. Haz clic en '⚙️ Configuración API' arriba a la derecha.");
       return;
     }
@@ -785,16 +785,12 @@ const ultimasClases = contexto.diario;
 
     if (modo === "clase") {
       systemPrompt = "Eres un Director Técnico y Entrenador de Tenis de Elite. Genera sesiones de entrenamiento altamente profesionales, pedagógicas, estructuradas minuto a minuto y motivadoras.";
-      const temasMasTrabajados =
-Object.entries(contexto.estadisticas)
-.sort((a,b)=>b[1]-a[1])
-.slice(0,5)
-.map(t=>`${t[0]} (${t[1]})`)
-.join(", ");
+   const temasMasTrabajados =
+contexto.temasMasTrabajados.join(", ");
       userPrompt = `
 Genera una propuesta de clase de tenis estructurada de 60 minutos con el siguiente contexto:
 
-1. GRUPO: "${grupoSel?.nombre || 'General'}" (Nivel: ${grupoSel?.nivel}, Objetivo General: "${grupoSel?.objetivo || 'Consistencia'}")
+1. GRUPO: "${grupoSel?.nombre || 'General'}" (Nivel: ${grupoSel?.nivel || "No definido"}, Objetivo General: "${grupoSel?.objetivo || 'Consistencia'}")
 2. OBJETIVO ESPECÍFICO DE HOY: "${objetivoClase}"
 3. ALUMNOS EN PISTA:
 ${alumnosGrupo.map(a => `- ${a.nombre}: Puntos fuertes (${a.fortalezas || 'N/A'}), A mejorar (${a.aMejorar || 'N/A'})`).join('\n')}
@@ -819,6 +815,7 @@ ejerciciosRelacionados.map(e=>`
 
 Utiliza preferentemente estos ejercicios.
 Solo inventa uno nuevo si ninguno resulta adecuado.
+
 6. ANÁLISIS DEL TRABAJO REALIZADO
 
 Temas más trabajados:
@@ -847,8 +844,8 @@ FORMATO REQUERIDO DE LA RESPUESTA:
       userPrompt = `
 Redacta un informe de evaluación técnico-táctica formal y alentador para la temporada/etapa de tenis con la siguiente información:
 
-- Alumno: ${alumSel?.nombre}
-- Grupo / Nivel: ${grupoSel?.nombre} (${grupoSel?.nivel})
+- Alumno: ${alumSel?.nombre || "Alumno"}
+- Grupo / Nivel: ${grupoSel?.nombre || "Grupo"} (${grupoSel?.nivel || "No definido"})
 - Puntos Fuertes Identificados: ${alumSel?.fortalezas || 'Pared de fondo, constancia'}
 - Áreas de Trabajo Principales: ${alumSel?.aMejorar || 'Empuñaduras y saques'}
 - HISTORIAL Y LÍNEA DE TIEMPO DE AVANCES REGISTRADOS:
