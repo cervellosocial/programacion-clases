@@ -721,7 +721,12 @@ const ultimasClases = contexto.diario;
 
     if (modo === "clase") {
       systemPrompt = "Eres un Director Técnico y Entrenador de Tenis de Elite. Genera sesiones de entrenamiento altamente profesionales, pedagógicas, estructuradas minuto a minuto y motivadoras.";
-      
+      const temasMasTrabajados =
+Object.entries(contexto.estadisticas)
+.sort((a,b)=>b[1]-a[1])
+.slice(0,5)
+.map(t=>`${t[0]} (${t[1]})`)
+.join(", ");
       userPrompt = `
 Genera una propuesta de clase de tenis estructurada de 60 minutos con el siguiente contexto:
 
@@ -735,7 +740,14 @@ ${ultimasClases.length === 0 ? "Sin historial previo." : ultimasClases.map(c => 
 
 5. MI BIBLIOTECA DE EJERCICIOS DISPONIBLES (Prioriza usar o adaptar estos ejercicios si encajan con el objetivo):
 ${data.ejercicios.map(e => `- [${e.categoria}] ${e.titulo}: ${e.descripcion}`).join('\n')}
+6. TEMAS MÁS TRABAJADOS EN ESTA TEMPORADA
 
+${temasMasTrabajados}
+
+No repitas siempre los mismos contenidos.
+
+Si detectas exceso de trabajo de algún aspecto,
+propón una progresión lógica hacia otros objetivos.
 FORMATO REQUERIDO DE LA RESPUESTA:
 - **Estructura en 3 Bloques**: 
   1. Calentamiento y Coordinación (10 min)
