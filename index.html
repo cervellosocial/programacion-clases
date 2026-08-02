@@ -631,7 +631,54 @@ function TabDiario({ data, updateData }) {
 // ===============================================
 
 function construirContextoIA(data, grupoId) {
+// ===============================================
+// BUSCADOR DE EJERCICIOS
+// ===============================================
 
+function buscarEjerciciosRelacionados(ejercicios, objetivo, nivel) {
+
+    if (!objetivo) return [];
+
+    const palabras = objetivo
+        .toLowerCase()
+        .replace(/[.,;:()]/g, " ")
+        .split(/\s+/)
+        .filter(p => p.length > 3);
+
+    return ejercicios
+        .map(e => {
+
+            let puntuacion = 0;
+
+            const texto = (
+                e.titulo +
+                " " +
+                e.descripcion +
+                " " +
+                e.categoria
+            ).toLowerCase();
+
+            palabras.forEach(p => {
+
+                if (texto.includes(p))
+                    puntuacion += 2;
+
+            });
+
+            if (e.nivel === nivel)
+                puntuacion += 3;
+
+            return {
+                ...e,
+                puntuacion
+            };
+
+        })
+        .filter(e => e.puntuacion > 0)
+        .sort((a,b)=>b.puntuacion-a.puntuacion)
+        .slice(0,6);
+
+}
     const grupo = data.grupos.find(g => g.id === grupoId);
 
     const alumnos = data.alumnos.filter(a => a.grupoId === grupoId);
@@ -715,6 +762,12 @@ const grupoSel = contexto.grupo;
 const alumnosGrupo = contexto.alumnos;
 
 const ultimasClases = contexto.diario;
+    const ejerciciosRelacionados =
+    buscarEjerciciosRelacionados(
+        contexto.ejercicios,
+        objetivoClase,
+        grupoSel?.nivel
+    );
 
     let systemPrompt = "";
     let userPrompt = "";
@@ -738,8 +791,23 @@ ${alumnosGrupo.map(a => `- ${a.nombre}: Puntos fuertes (${a.fortalezas || 'N/A'}
 4. ÚLTIMAS CLASES IMPARTIDAS Y FEEDBACK REGISTRADO:
 ${ultimasClases.length === 0 ? "Sin historial previo." : ultimasClases.map(c => `- ${c.fecha}: ${c.resumen} (Feedback: ${c.feedback || 'Sin notas'})`).join('\n')}
 
-5. MI BIBLIOTECA DE EJERCICIOS DISPONIBLES (Prioriza usar o adaptar estos ejercicios si encajan con el objetivo):
-${data.ejercicios.map(e => `- [${e.categoria}] ${e.titulo}: ${e.descripcion}`).join('\n')}
+5. EJERCICIOS DE MI BIBLIOTECA MÁS RELACIONADOS
+
+${
+ejerciciosRelacionados.length
+?
+ejerciciosRelacionados.map(e=>`
+• ${e.titulo}
+  Categoría: ${e.categoria}
+  Nivel: ${e.nivel}
+  Descripción: ${e.descripcion}
+`).join("\n")
+:
+"No hay ejercicios relacionados."
+}
+
+Utiliza preferentemente estos ejercicios.
+Solo inventa uno nuevo si ninguno resulta adecuado.
 6. TEMAS MÁS TRABAJADOS EN ESTA TEMPORADA
 
 ${temasMasTrabajados}
