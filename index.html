@@ -622,15 +622,7 @@ function TabDiario({ data, updateData }) {
 }
 
 // ------------------- PESTAÑA MOTOR DE IA -------------------
-  // ===============================================
-// CEREBRO DE LA IA
-// ===============================================
 
-// ===============================================
-// CEREBRO DE LA IA
-// ===============================================
-
-function construirContextoIA(data, grupoId) {
 // ===============================================
 // BUSCADOR DE EJERCICIOS
 // ===============================================
@@ -651,11 +643,9 @@ function buscarEjerciciosRelacionados(ejercicios, objetivo, nivel) {
             let puntuacion = 0;
 
             const texto = (
-                e.titulo +
-                " " +
-                e.descripcion +
-                " " +
-                e.categoria
+                (e.titulo || "") + " " +
+                (e.descripcion || "") + " " +
+                (e.categoria || "")
             ).toLowerCase();
 
             palabras.forEach(p => {
@@ -679,6 +669,13 @@ function buscarEjerciciosRelacionados(ejercicios, objetivo, nivel) {
         .slice(0,6);
 
 }
+
+// ===============================================
+// CEREBRO DE LA IA
+// ===============================================
+
+function construirContextoIA(data, grupoId) {
+
     const grupo = data.grupos.find(g => g.id === grupoId);
 
     const alumnos = data.alumnos.filter(a => a.grupoId === grupoId);
@@ -689,9 +686,8 @@ function buscarEjerciciosRelacionados(ejercicios, objetivo, nivel) {
 
     const ejercicios = data.ejercicios;
 
-    // Analiza qué se ha trabajado más
     const textoHistorico = diario
-        .map(d => `${d.resumen} ${d.feedback}`)
+        .map(d => `${d.resumen || ""} ${d.feedback || ""}`)
         .join(" ")
         .toLowerCase();
 
@@ -722,6 +718,17 @@ function buscarEjerciciosRelacionados(ejercicios, objetivo, nivel) {
 
     });
 
+    const rankingTemas = Object.entries(estadisticas)
+        .sort((a,b)=>b[1]-a[1]);
+
+    const temasMasTrabajados = rankingTemas
+        .slice(0,5)
+        .map(t=>t[0]);
+
+    const temasOlvidados = rankingTemas
+        .slice(-5)
+        .map(t=>t[0]);
+
     return {
 
         grupo,
@@ -732,7 +739,11 @@ function buscarEjerciciosRelacionados(ejercicios, objetivo, nivel) {
 
         ejercicios,
 
-        estadisticas
+        estadisticas,
+
+        temasMasTrabajados,
+
+        temasOlvidados
 
     };
 
@@ -747,7 +758,7 @@ function TabIA({ data, updateData }) {
   const [errorAPI, setErrorAPI] = useState("");
 
   const ejecutarIA = async () => {
-    if (!data.apiKey) {
+    iif (!data.apiKey.trim()) {
       setErrorAPI("Falta configurar tu API Key. Haz clic en '⚙️ Configuración API' arriba a la derecha.");
       return;
     }
@@ -808,14 +819,19 @@ ejerciciosRelacionados.map(e=>`
 
 Utiliza preferentemente estos ejercicios.
 Solo inventa uno nuevo si ninguno resulta adecuado.
-6. TEMAS MÁS TRABAJADOS EN ESTA TEMPORADA
+6. ANÁLISIS DEL TRABAJO REALIZADO
 
-${temasMasTrabajados}
+Temas más trabajados:
 
-No repitas siempre los mismos contenidos.
+${contexto.temasMasTrabajados.join(", ")}
 
-Si detectas exceso de trabajo de algún aspecto,
-propón una progresión lógica hacia otros objetivos.
+Temas menos trabajados:
+
+${contexto.temasOlvidados.join(", ")}
+
+Evita repetir constantemente los contenidos más trabajados.
+
+Siempre que sea posible introduce alguno de los contenidos menos trabajados para mantener una progresión equilibrada.
 FORMATO REQUERIDO DE LA RESPUESTA:
 - **Estructura en 3 Bloques**: 
   1. Calentamiento y Coordinación (10 min)
