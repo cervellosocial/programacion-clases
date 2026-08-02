@@ -66,7 +66,10 @@ function App() {
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      try { setData(JSON.parse(raw)); } catch(e) { console.error(e); }
+      try { 
+        const parsed = JSON.parse(raw);
+        setData(prev => ({ ...prev, ...parsed })); 
+      } catch(e) { console.error(e); }
     }
   }, []);
 
@@ -78,8 +81,10 @@ function App() {
     setData(prev => ({ ...prev, [key]: newValue }));
   };
 
+  // ✅ No exportar la API Key en los backups por seguridad
   const exportarJSON = () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const copiaSegura = { ...data, apiKey: "" };
+    const blob = new Blob([JSON.stringify(copiaSegura, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -95,7 +100,12 @@ function App() {
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target.result);
-        setData(parsed);
+        // Mantener la API key que ya tenía configurada el usuario si no viene una nueva
+        setData(prev => ({
+          ...parsed,
+          apiKey: parsed.apiKey || prev.apiKey || "",
+          apiProveedor: parsed.apiProveedor || prev.apiProveedor || "openai"
+        }));
         alert("¡Datos cargados correctamente!");
       } catch (err) { alert("Archivo no válido."); }
     };
@@ -684,15 +694,20 @@ ESTRUCTURA DEL INFORME:
 `;
     }
 
+    // ✅ Timeout de 30 segundos usando AbortController
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     try {
       let textoGenerado = "";
 
       if (data.apiProveedor === "openai") {
         const res = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
+          signal: controller.signal,
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${data.apiKey}`
+            "Authorization": `Bearer ${data.apiKey.trim()}`
           },
           body: JSON.stringify({
             model: "gpt-4o-mini",
@@ -705,17 +720,18 @@ ESTRUCTURA DEL INFORME:
         });
 
         if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error?.message || "Error al conectar con OpenAI.");
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `Error en la API de OpenAI (Código: ${res.status})`);
         }
 
         const jsonRes = await res.json();
-        textoGenerado = jsonRes.choices[0].message.content;
+        textoGenerado = jsonRes.choices?.[0]?.message?.content;
 
       } else {
-        // FETCH CORREGIDO A LA API ESTABLE v1 DE GEMINI
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${data.apiKey}`, {
+        // ✅ Conexión robusta y limpia con Gemini v1
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${data.apiKey.trim()}`, {
           method: "POST",
+          signal: controller.signal,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [
@@ -730,18 +746,30 @@ ESTRUCTURA DEL INFORME:
         });
 
         if (!res.ok) {
-          const errData = await res.json();
-          throw new Error(errData.error?.message || "Error al conectar con Gemini.");
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `Error en la API de Gemini (Código: ${res.status}). Revisa la validez de tu API Key.`);
         }
 
         const jsonRes = await res.json();
         textoGenerado = jsonRes.candidates?.[0]?.content?.parts?.[0]?.text;
       }
 
+      // ✅ Validación de respuesta vacía
+      if (!textoGenerado || textoGenerado.trim() === "") {
+        throw new Error("El modelo de IA devolvió una respuesta vacía. Por favor, vuelve a intentarlo.");
+      }
+
       setResultadoIA(textoGenerado);
+
     } catch (err) {
-      setErrorAPI(err.message || "Error al conectar con la IA.");
-    } fontinally {
+      if (err.name === 'AbortError') {
+        setErrorAPI("La solicitud ha caducado (Timeout 30s). Comprueba tu conexión a internet e inténtalo de nuevo.");
+      } else {
+        setErrorAPI(err.message || "Error al conectar con el servicio de IA.");
+      }
+    } finally {
+      // ✅ Corrección estructural: bloque finally limpio
+      clearTimeout(timeoutId);
       setCargando(false);
     }
   };
@@ -815,7 +843,7 @@ ESTRUCTURA DEL INFORME:
 
         {errorAPI && (
           <div className="p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-xl">
-            {errorAPI}
+            ⚠️ {errorAPI}
           </div>
         )}
 
