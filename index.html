@@ -622,6 +622,30 @@ function TabDiario({ data, updateData }) {
 }
 
 // ------------------- PESTAÑA MOTOR DE IA -------------------
+  // ===============================================
+// CEREBRO DE LA IA
+// ===============================================
+
+function construirContextoIA(data, grupoId) {
+
+    const grupo = data.grupos.find(g => g.id === grupoId);
+
+    const alumnos = data.alumnos.filter(a => a.grupoId === grupoId);
+
+    const diario = data.diario
+        .filter(d => d.grupoId === grupoId)
+        .slice(0,20);
+
+    const ejercicios = data.ejercicios;
+
+    return {
+        grupo,
+        alumnos,
+        diario,
+        ejercicios
+    };
+
+}
 function TabIA({ data, updateData }) {
   const [modo, setModo] = useState("clase"); // "clase" o "informe"
   const [grupoId, setGrupoId] = useState(data.grupos[0]?.id || "");
@@ -640,9 +664,13 @@ function TabIA({ data, updateData }) {
     setCargando(true);
     setResultadoIA("");
 
-    const grupoSel = data.grupos.find(g => g.id === grupoId);
-    const alumnosGrupo = data.alumnos.filter(a => a.grupoId === grupoId);
-    const ultimasClases = data.diario.filter(d => d.grupoId === grupoId).slice(0, 4);
+  const contexto = construirContextoIA(data, grupoId);
+
+const grupoSel = contexto.grupo;
+
+const alumnosGrupo = contexto.alumnos;
+
+const ultimasClases = contexto.diario;
 
     let systemPrompt = "";
     let userPrompt = "";
