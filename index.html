@@ -626,6 +626,10 @@ function TabDiario({ data, updateData }) {
 // CEREBRO DE LA IA
 // ===============================================
 
+// ===============================================
+// CEREBRO DE LA IA
+// ===============================================
+
 function construirContextoIA(data, grupoId) {
 
     const grupo = data.grupos.find(g => g.id === grupoId);
@@ -638,11 +642,51 @@ function construirContextoIA(data, grupoId) {
 
     const ejercicios = data.ejercicios;
 
+    // Analiza qué se ha trabajado más
+    const textoHistorico = diario
+        .map(d => `${d.resumen} ${d.feedback}`)
+        .join(" ")
+        .toLowerCase();
+
+    const temas = [
+        "derecha",
+        "revés",
+        "saque",
+        "resto",
+        "volea",
+        "remate",
+        "globo",
+        "passing",
+        "transición",
+        "consistencia",
+        "profundidad",
+        "ataque",
+        "defensa"
+    ];
+
+    const estadisticas = {};
+
+    temas.forEach(t => {
+
+        const regex = new RegExp(t,"gi");
+
+        estadisticas[t] =
+            (textoHistorico.match(regex) || []).length;
+
+    });
+
     return {
+
         grupo,
+
         alumnos,
+
         diario,
-        ejercicios
+
+        ejercicios,
+
+        estadisticas
+
     };
 
 }
